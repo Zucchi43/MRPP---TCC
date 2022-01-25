@@ -1,120 +1,66 @@
 let robot_speed = 5;
 let width = 1200; //TAMANHO HORIZONTAL DO MAPA
 let height = 1200; //TAMANHO VERTICAL DO MAPA
-let cols = 50; // COLUNAS PARA DIVISÃO DO MAPA EM CELULAS
-let rows = 50;
-let num_robots = 10;
+let cols = 25; // COLUNAS PARA DIVISÃO DO MAPA EM CELULAS
+let rows = 25;
+let num_robots = 20;
 let grid = [];
+let robots_locations = new Array(num_robots);
 let checkbox;
-//COORDENADAS PARA TESTE HARDCODE
-let coords_test = [
-	[3, 0],
-	[3, 3],
-	[25, 3],
-	[25, 15],
-	[10, 15],
-	[3, 15],
-	[3, 3],
-	[3, 0],
-	[0, 0]
-];
+let OBS_RATIO = 0.7;
+let colisao = true;
 let i = 0;
 var r = [];
+let timer = 0;
+let millisec = 0;
+let score = 0;
 
-function removeFromArray(arr, elt) {
-	// Could use indexOf here instead to be more efficient
-	for (var i = arr.length - 1; i >= 0; i--) {
-		if (arr[i] == elt) {
-			arr.splice(i, 1);
+
+function Reset() {
+	timer = millis();
+	millisec = 0;
+	score = 0;
+	grid = [];
+	i = 0;
+	r = [];
+	robots_locations = new Array(num_robots);
+
+	//2d Array for the map grid
+	for (let j = 0; j < cols; j++) {
+		grid.push(new Array(rows));
+	}
+	//creating the cell object for each space
+	for (let j = 0; j < cols; j++) {
+		for (let k = 0; k < rows; k++) {
+			grid[j][k] = new Cell(j, k, (Math.random() > OBS_RATIO) ? 1 : 0);
 		}
+	}
+	//PEGAR TODOS OS VIZINHOS
+	for (let j = 0; j < cols; j++) {
+		for (let k = 0; k < rows; k++) {
+			grid[j][k].pegarVizinhos(grid);
+		}
+	}
+	//CRIAR E INICIALIZAR OS ROBOS
+	for (let k = 0; k < num_robots; k++) {
+		r.push(new robot(k)); // ROBO/CARRINHO
+		//console.log(k);
+		r[k].caminho = Dijkstra(grid, RandomValidCell(grid), RandomValidCell(grid), i);
+		r[k].x = r[k].caminho[r[k].caminho.length - 1].x;
+		r[k].y = r[k].caminho[r[k].caminho.length - 1].y;
+		robots_locations[k] = r[k].caminho[r[k].caminho.length];
 	}
 }
 
-function heuristic(a, b) {
-	var d = dist(a.i, a.j, b.i, b.j);
-	// var d = abs(a.i - b.i) + abs(a.j - b.j);
-	return d;
-}
-
-//OBJETO DA CELULA. F,H,G VARIAVEIS PARA ALGORITMO?
-//STATE 0 -> VERDE LIVRE
-//STATE 1 -> VERMELHO OBSTACULO
-
-function Cell(i, j, state) {
-	this.x = width / cols * i;
-	this.y = height / rows * j;
-	this.i = i;
-	this.j = j;
-	this.f = 0;
-	this.h = 0;
-	this.g = Math.infinity;
-	this.vizinhos = [];
-	this.state = state
-	this.pai = undefined;
-	this.visited = false;
-	this.show = function () {
-		//rectMode(CENTER);
-		switch (this.state) {
-			case 0:
-				fill(0, 255, 0);
-				break;
-			case 1:
-				fill(255, 0, 0);
-				break;
-			case 2:
-				fill(255, 255, 0);
-				break;
-		}
-		rect(this.x, this.y, width / cols, height / rows)
-
-	}
-	this.pegarVizinhos = function (grid) {
-		//ESQUERDO
-		if (this.i > 0) {
-			this.vizinhos.push(grid[this.i - 1][this.j])
-		}
-		//DIREITO
-		if (this.i < grid.length - 1) {
-			this.vizinhos.push(grid[this.i + 1][this.j])
-		}
-		//SUPERIOR
-		if (this.j < rows - 1) {
-			this.vizinhos.push(grid[this.i][this.j + 1])
-		}
-		//INFERIOR
-		if (this.j > 0) {
-			this.vizinhos.push(grid[this.i][this.j - 1])
-		}
-
-
-	}
-
-	this.reset = function () {
-		this.g = Math.infinity;
-		this.pai = undefined;
-		this.visited = false;
-	}
-
-
-
-
-
-}
-
-function RandomValidCell(grid) {
-
-	let Cell_try = grid[Math.floor(Math.random() * cols)][Math.floor(Math.random() * rows)]
-	if (!Cell_try.vizinhos[0]) Cell_try.pegarVizinhos(grid);
-	//CONSERTAR PARA O CASO DA CELULA ESTAR NA BEIRADA E NAO POSSUIR ALGUM DOS VIZINHOS
-	if (Cell_try.state != 1) { //&& (Cell_try.vizinhos[0].state !=1  || Cell_try.vizinhos[1].state !=1  || Cell_try.vizinhos[2].state !=1  || Cell_try.vizinhos[3].state != 1  ) ){
-		return Cell_try;
-	}
-	return RandomValidCell(grid);
-
-}
 
 
 function setup() {
+	noLoop();
+	//INTERFACE RESET
+	var Reset_Button = createButton("Reset");
+	Reset_Button.position(width + 20, 250);
+	Reset_Button.size(100, 50);
+	Reset_Button.mousePressed(Reset);
 	//INTERFACE: BOTAO
 	button = createButton('START/STOP');
 	button.position(width + 20, 10);
@@ -133,40 +79,31 @@ function setup() {
 	checkbox.size(100, 50);
 	checkbox.changed(STEP_CHANGED);
 
-
-
-	//2d Array for the map grid
-	for (let j = 0; j < cols; j++) {
-		grid.push(new Array(rows));
+	//INTERFACE: LIGAR DESLIGAR COLISAO
+	checkbox = createCheckbox('COLISÂO', true);
+	checkbox.position(width + 20, 200);
+	checkbox.size(100, 50);
+	checkbox.changed(COLISAO_CHANGED);
+	try {
+		Reset();
+	} catch (err) {
+		Reset();
 	}
-	//creating the cell object for each space
-	for (let j = 0; j < cols; j++) {
-		for (let k = 0; k < rows; k++) {
-			grid[j][k] = new Cell(j, k, (Math.random() > 0.8) ? 1 : 0);
-		}
-	}
-	for (let k = 0; k < num_robots; k++) {
-		r.push(new robot()); // ROBO/CARRINHO
-		console.log(k);
-		r[k].caminho = Dijkstra(grid, RandomValidCell(grid), RandomValidCell(grid));
-		r[k].x = r[k].caminho[r[k].caminho.length - 1].x;
-		r[k].y = r[k].caminho[r[k].caminho.length - 1].y;
-	}
-
-
-
 	createCanvas(width * 2, height * 2);
 }
 
 function draw() {
+	let last_place = 0;
 	frameRate(slider.value());
 	background(255);
 	stroke(0);
 	fill(0);
-	let m = millis();
+	millisec = millis() - timer;
 	textSize(48);
-	text(int(m / (1000 * 60)) + "min :" + int(m / 1000 % 60) + "seg", 20, height + 50); //TIMER
+	text(int(millisec / (1000 * 60) % 60) + "min :" + int(millisec / 1000 % 60) + "seg", 20, height + 50); //TIMER
 	text("FRAMERATE: " + slider.value(), width - 100, height + 50); //FRAMERATE
+	text("SCORE:"  + int(score) + " FPS", width/2, height + 50); //FRAMERATE
+
 	translate(0, height);
 	scale(1, -1);
 
@@ -175,20 +112,59 @@ function draw() {
 	for (let i = 0; i < num_robots; i++) {
 
 
-		//console.log(i)
-		if (r[i].goto(r[i].caminho[r[i].caminho.length - 1 - r[i].cnt].x, r[i].caminho[r[i].caminho.length - 1 - r[i].cnt].y)) {
 
-			if (r[i].cnt == r[i].caminho.length - 1) {
-				r[i].cnt = 0;
-				//console.log(r[i].caminho);
-				r[i].caminho[0].state = 0;
-				r[i].caminho = Dijkstra(grid, grid[r[i].caminho[0].i][r[i].caminho[0].j], RandomValidCell(grid));
-				//r[i].caminho = Dijkstra(grid,r[i].caminho[0],grid[Math.floor(Math.random()*cols)][Math.floor(Math.random()*rows)]);
+		if (!Iminent_Collision(i)) {
+			//console.log(i)
+			if (r[i].goto(r[i].caminho[r[i].caminho.length - 1 - r[i].cnt].x, r[i].caminho[r[i].caminho.length - 1 - r[i].cnt].y)) {
+				last_place = 1;
+				robots_locations[i] = (r[i].caminho[r[i].caminho.length - 1 - r[i].cnt]);
+
+				if (r[i].cnt == r[i].caminho.length - 1) {
+					r[i].cnt = 0;
+					score = score + 1/frameRate();
+					//console.log(r[i].caminho);
+					r[i].caminho[0].state = 0;
+					r[i].caminho = Dijkstra(grid, grid[r[i].caminho[0].i][r[i].caminho[0].j], RandomValidCell(grid), i);
+				}
+
+
+				if (r[i].cnt < r[i].caminho.length - 1) r[i].cnt++;
+
 			}
-			if (r[i].cnt < r[i].caminho.length - 1) r[i].cnt++;
-		}
-	}
+		} else {
+			//ROBOTS STILL SWITCHING PLACES
+			//1- RANDOM WALK TO A VALID CELL
+			let vizinhos;
+			let counting = 0;
+			if (r[i].cnt != 0) {
+				vizinhos = r[i].caminho[r[i].caminho.length - r[i].cnt].vizinhos;
+			}
+			let vizinho_valido;
+			if (vizinhos) {
+				vizinho_valido = robots_locations[i];
+				while (vizinho_valido.state == 1 || is_in_Array(vizinho_valido, robots_locations)) {
+					if (vizinhos) vizinho_valido = random(vizinhos);
+					if (counting > 5) {
+						break;
+					}
+					counting++;
+				}
+				if (vizinho_valido.state != 1 && !is_in_Array(vizinho_valido, robots_locations)) {
+					r[i].goto(vizinho_valido.x, vizinho_valido.y);
+					last_place = 2
 
+					//2- RUN DIJKSTRA WITH NEW BEGGINING AND SAME ENDING
+					robots_locations[i] = vizinho_valido;
+					r[i].caminho = Dijkstra(grid, robots_locations[i], r[i].caminho[0], i);
+					r[i].cnt = 0;
+				}
+				//console.log("RODOU");	
+			}
+			//3-CHECK IF IMINENT COLLISION?
+		}
+
+	}
+	//console.log(robots_locations);
 
 
 
@@ -202,19 +178,77 @@ function draw() {
 	for (let i = 0; i < num_robots; i++) {
 		r[i].update();
 		r[i].show();
+
 	}
+
+
+
 	//DISPLAY TIMER
 
+	//Same_place(last_place);
 
 
+}
+
+
+function removeFromArray(arr, elt) {
+	// Could use indexOf here instead to be more efficient
+	for (var i = arr.length - 1; i >= 0; i--) {
+		if (arr[i] == elt) {
+			arr.splice(i, 1);
+		}
+	}
+}
+
+function heuristic(a, b) {
+	var d = dist(a.i, a.j, b.i, b.j);
+	// var d = abs(a.i - b.i) + abs(a.j - b.j);
+	return d;
+}
+
+
+function Same_place(i) {
+	for (let j = 0; j < num_robots; j++) {
+		for (let k = 0; k < num_robots; k++) {
+			if (r[j].x == r[k].x && r[j].y == r[k].y && k != j) {
+				noLoop();
+				console.log("MESMO LUGAR");
+				console.log(j);
+				console.log(k);
+				console.log("FOI AQUI");
+				console.log(i);
+			}
+		}
+	}
+}
+
+//FUNÇAO DE VERIFICACAO DE UM ELEMENTO NO ARRAY
+function is_in_Array(Elemento, Arr) {
+	for (let i = 0; i < Arr.length; i++) {
+		if (Elemento == Arr[i]) return true;
+	}
+	return false;
+}
+//FUNCAO DE SELECIONAR UMA CELULA ALEATORIA NAO OCUPADA
+function RandomValidCell(grid) {
+
+	let Cell_try = grid[Math.floor(Math.random() * cols)][Math.floor(Math.random() * rows)]
+	if (!Cell_try.vizinhos[0]) Cell_try.pegarVizinhos(grid);
+	//CONSERTAR PARA O CASO DA CELULA ESTAR NA BEIRADA E NAO POSSUIR ALGUM DOS VIZINHOS
+	if (Cell_try.state == 0 && !is_in_Array(Cell_try, robots_locations)) { //&& (Cell_try.vizinhos[0].state !=1  || Cell_try.vizinhos[1].state !=1  || Cell_try.vizinhos[2].state !=1  || Cell_try.vizinhos[3].state != 1  ) ){
+		return Cell_try;
+	}
+	return RandomValidCell(grid);
 
 }
 
 //FUNÇÂO DE INTERFACE BOTAO
 function Start_Stop_Simu() {
 	if (isLooping()) noLoop();
-	else loop()
-
+	 else {
+		timer = millis() - millisec;
+		loop()
+	}
 }
 
 function STEP_CHANGED() {
@@ -222,12 +256,43 @@ function STEP_CHANGED() {
 	else loop();
 }
 
+function COLISAO_CHANGED() {
+	if (checkbox.checked()) colisao = true;
+	else colisao = false;
+}
+
 
 function mousePressed() {
 	if (checkbox.checked()) redraw();
 }
 
+//FUNÇÂO DE PREVISAO DE COLISAO
 
+function Iminent_Collision(Current_Robot) {
+	for (let i = 0; i < num_robots; i++) {
+		//CHECK IF PREVIOUS AND FOLLOWING ROBOTS WILL MOVE TO THE SAME PLACE AS ME IN THEIR NEXT TURN
+		if (i != Current_Robot) {
+			//console.log(r[i].caminho[r[i].caminho.length  - 1 - r[i].cnt]);
+			if (r[Current_Robot].caminho[r[Current_Robot].caminho.length - 1 - r[Current_Robot].cnt] == robots_locations[i]) {
+
+				//r[Current_Robot].blocked = true;
+				return colisao;
+			}
+
+		}
+
+		//if (r[i].caminho[r[i].caminho.length - 1 - r[i].cnt] == r[current_Robot].caminho[r[current_Robot].caminho.length - 1 - r[current_Robot].cnt ]) return true
+
+	}
+
+	//}
+	//console.log(r[i].caminho[r[i].caminho.length  - r[i].cnt]);
+	//console.log("CURRENT ROBOT")
+	//console.log(r[Current_Robot]);
+	r[Current_Robot].blocked = false;
+	return false;
+
+}
 
 
 /* 1 -Mark all nodes unvisited. Create a set of all the unvisited nodes called the unvisited set.
@@ -242,11 +307,12 @@ function mousePressed() {
 
 6-Otherwise, select the unvisited node that is marked with the smallest tentative distance, set it as the new "current node", and go back to step 3 */
 
-function Dijkstra(grid, start, end) {
+function Dijkstra(grid, start, end, robot) {
 	i = 0;
 	start.g = 0;
 	start.state = 0;
 	end.state = 2;
+	end.target = robot;
 	var OpenSet = [];
 	OpenSet.push(start);
 	var ClosedSet = [];
@@ -285,7 +351,6 @@ function Dijkstra(grid, start, end) {
 		removeFromArray(OpenSet, atual);
 		ClosedSet.push(atual);
 		//PEGAR OS VIZINHOS DO ATUAL
-		if (!atual.vizinhos[0]) atual.pegarVizinhos(grid);
 		var vizinhos = atual.vizinhos;
 		for (let i = 0; i < vizinhos.length; i++) {
 			var vizinho = vizinhos[i];
