@@ -3,13 +3,12 @@ function robot(number) {
 	this.y = 0;
 	this.speed_x = 0;
 	this.speed_y = 0;
-	this.accel_x = 0;
-	this.accel_y = 0;
 	this.caminho =[];
 	this.cnt = 0;
 	this.dir = 0;
     this.number = number;
     this.blocked = false;
+	this.color =  Math.floor(random(255));
 	
 	this.update = function(){
 		//this.x += this.speed_x;
@@ -19,10 +18,10 @@ function robot(number) {
 
 	}
 	this.show = function(){
-		fill(255);
+		fill(this.color);
 		rect(this.x,this.y,width/cols,height/rows);  
         fill(0);
-        //text(this.number,this.x + width/cols/2,this.y+ height/rows/2 );
+       // text(this.number,this.x + width/cols/2,this.y+ height/rows/2 );
 	}
 	this.goto = function(x,y){
 		if (x > this.x){
